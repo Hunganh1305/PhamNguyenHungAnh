@@ -1,0 +1,90 @@
+// I will refactor the code below and explain this
+interface WalletBalance {
+    currency: string;
+    amount: number;
+    blockchain: string; // assuming this was missing
+}
+interface FormattedWalletBalance {
+    currency: string;
+    amount: number;
+    formatted: string;
+}
+
+interface Props extends BoxProps { }
+const WalletPage: React.FC<Props> = (props: Props) => {
+    const { children, ...rest } = props;
+    const balances = useWalletBalances();
+    const prices = usePrices();
+
+    const getPriority = (blockchain: string): number => { // change type of blockchain to string
+        switch (blockchain) {
+            case "Osmosis":
+                return 100;
+            case "Ethereum":
+                return 50;
+            case "Arbitrum":
+                return 30;
+            case "Zilliqa":
+                return 20;
+            case "Neo":
+                return 20;
+            default:
+                return -99;
+        }
+    };
+    // Computational Inefficiencies and Anti-Patterns
+
+    // 1. Unnecessary Recalculation with useMemo:
+    // The sortedBalances calculation depends on both balances and prices. However, prices are not used in the filtering and sorting process. Including prices in the dependency array causes unnecessary recalculations of sortedBalances whenever prices change.
+    // Updated Dependency Array::
+    // Removed prices from the dependency array of useMemo for sortedBalances since it is not used in the filtering and sorting.
+
+    // 2.Incorrect Conditional Logic in Filtering:
+    // The conditional logic within the filter method appears incorrect. Specifically, lhsPriority is not defined within the filter function, leading to a potential error.
+    // Corrected Filtering Logic:
+    // Corrected the logic in the filter method to check getPriority(balance.blockchain) directly.
+    const sortedBalances = useMemo(() => {
+        return balances
+            .filter(
+                (balance: WalletBalance) =>
+                    getPriority(balance.blockchain) > -99 && balance.amount <= 0
+            )
+            .sort(
+                (lhs: WalletBalance, rhs: WalletBalance) =>
+                    getPriority(rhs.blockchain) - getPriority(lhs.blockchain)
+            );
+    }, [balances]);
+
+
+    // 3.Inefficient Sorting Mechanism:
+    // The sorting mechanism within useMemo is complex and can be optimized. Sorting and filtering in a single step can make the code more efficient and readable.
+    // Optimized Sorting:
+    // Combined filtering and sorting in a single step within the useMemo for sortedBalances.
+
+    // 4.Repeated Calculation of Formatted Balances:
+    // The formattedBalances map is calculated but not used in the component. Instead, the formatted string is calculated within the rows map, causing potential repeated calculations.
+    // Memoized Row Calculations:
+    // Moved the calculation of rows into a useMemo to avoid recalculating them on every render. This memoizes the rows based on sortedBalances and prices.
+
+    // 5.Inefficient use of map within render:
+    // Directly using map within the JSX can lead to performance issues if the number of items is large. Calculating it outside and storing it in a variable can improve readability and performance.
+    // Removed Unused Variable:
+    // Removed the unused formattedBalances variable, instead calculating the formatted amount directly in the rows map.
+    const rows = useMemo(() => {
+        return sortedBalances.map((balance: WalletBalance, index: number) => {
+            const formattedBalance = balance.amount.toFixed();
+            const usdValue = prices[balance.currency] * balance.amount;
+            return (
+                <WalletRow
+                    className= { classes.row }
+            key = { index }
+            amount = { balance.amount }
+            usdValue = { usdValue }
+            formattedAmount = { formattedBalance }
+                />
+        );
+    });
+}, [prices, sortedBalances]);
+
+return <div { ...rest } > { rows } </div>;
+  };
